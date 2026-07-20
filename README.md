@@ -41,7 +41,7 @@ If you want me to add example curl/Postman requests or expand OTP handling and t
 # OTP-Protected-Text-Encryption-Designs
 A collection of reference implementations demonstrating different approaches to building an OTP-protected encryption service. The repository explores multiple key management strategies on C.
 
-
+```
 backend/
 │
 ├── include/
@@ -103,3 +103,4 @@ backend/
 │   └── openssl/
 │
 └── CMakeLists.txt
+```
