@@ -41,9 +41,9 @@ Download and install MSYS2 from https://www.msys2.org/.
 
 ### 2. Update Package Database
 Open the MSYS2 UCRT64 terminal and update the package database:
-
+```
   pacman -Syu
-
+```
 ### 3. Install Required Dependencies
 Run the following command to install the C compiler toolchain, CMake, Ninja, OpenSSL, and libcurl:
 ```
@@ -99,22 +99,22 @@ When the build is finished, the executable (`EncryptionAPI.exe`) is created insi
 
 Because C applications read `.env` relative to their current working execution directory, you must do ONE of the following steps:
 
-Option A (Recommended for Development):
+### Option A (Recommended for Development):
 Copy or move your `.env` file into the `build/` folder where the executable lives:
 
-  # Using MSYS2 terminal:
+  Using MSYS2 terminal:
   ```
   cp .env build/.env
   ```
-  # Using PowerShell:
+  Using PowerShell:
   ```
   Copy-Item .env build\.env
   ```
-Option B (Running from Root):
+### Option B (Running from Root):
 If you launch the executable from the root `backend/` directory while referencing the build path, the app will read the `.env` from the root folder:
-
+```
   ./build/EncryptionAPI.exe
-
+```
 ---
 
 ## Running the Server
