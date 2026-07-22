@@ -53,21 +53,21 @@ PUBLIC_API_BASE_URL=http://localhost:3000
 ## Installation & Setup
 
 1. Navigate to the frontend directory:
-
+```
      cd frontend
-
+```
 2. Install dependencies:
-
+```
      npm install
-
+```
 ---
 
 ## Running the Development Server
 
 Start the Vite development server:
-
+```
   npm run dev
-
+```
 By default, the application will be accessible at http://localhost:5173.
 
 ---
@@ -75,13 +75,13 @@ By default, the application will be accessible at http://localhost:5173.
 ## Building for Production
 
 To create an optimized production build:
-
+```
   npm run build
-
+```
 To preview the built application locally:
-
+```
   npm run preview
-
+```
 ---
 
 ## Key Files of Interest
