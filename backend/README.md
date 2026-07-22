@@ -46,17 +46,15 @@ Open the MSYS2 UCRT64 terminal and update the package database:
 
 ### 3. Install Required Dependencies
 Run the following command to install the C compiler toolchain, CMake, Ninja, OpenSSL, and libcurl:
-
+```
   pacman -S --needed \
     mingw-w64-ucrt-x86_64-toolchain \
     mingw-w64-ucrt-x86_64-cmake \
     mingw-w64-ucrt-x86_64-ninja \
     mingw-w64-ucrt-x86_64-openssl \
     mingw-w64-ucrt-x86_64-curl
-
+```
 Note: When prompted during the toolchain installation, press Enter to select all default components.
-
----
 
 ## Environment Variables (.env Setup)
 
@@ -77,17 +75,17 @@ SMTP_PASSWORD="yourpassword"
 ### Using MSYS2 UCRT64 Terminal (Recommended)
 
 1. Navigate to the backend directory:
-
+```
      cd /c/path/to/your/project/backend
-
+```
 2. Configure the build using Ninja:
-
+```
      cmake -B build -G Ninja
-
+```
 3. Build the project:
-
+```
      cmake --build build
-
+```
 ### Using PowerShell / Command Prompt (MinGW Makefiles)
 ```
   cd backend
@@ -105,11 +103,13 @@ Option A (Recommended for Development):
 Copy or move your `.env` file into the `build/` folder where the executable lives:
 
   # Using MSYS2 terminal:
+  ```
   cp .env build/.env
-
+  ```
   # Using PowerShell:
+  ```
   Copy-Item .env build\.env
-
+  ```
 Option B (Running from Root):
 If you launch the executable from the root `backend/` directory while referencing the build path, the app will read the `.env` from the root folder:
 
@@ -122,16 +122,17 @@ If you launch the executable from the root `backend/` directory while referencin
 Start the compiled executable:
 
 ### MSYS2 UCRT64:
+```
   cd build
   ./EncryptionAPI.exe
-
+```
 ### PowerShell:
+```
   cd build
   .\EncryptionAPI.exe
+```
+By default, the HTTP server listens on port 3000 (or the custom PORT).
 
-By default, the HTTP server listens on port 3000 (or the custom PORT set in your .env file).
-
----
 
 ## API Endpoints
 
