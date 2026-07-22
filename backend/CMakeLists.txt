@@ -6,21 +6,9 @@ set(CMAKE_C_STANDARD 17)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
-# ==============================================================================
-# NOTE ON OPENSSL PATH CONFIGURATION:
-# CMake needs to locate the OpenSSL headers and development libraries.
-# If CMake cannot find OpenSSL automatically, uncomment the block below 
-# and adjust the path to match where your OpenSSL installation lives.
-# Examples:
-#   - MSYS2 UCRT64: "C:/msys64/ucrt64"
-#   - Shining Light Productions: "C:/Program Files/OpenSSL-Win64"
-# ==============================================================================
-if(WIN32)
-    set(OPENSSL_ROOT_DIR "C:/msys64/ucrt64" CACHE PATH "Path to OpenSSL root directory")
-endif()
-
-# 1. Find the OpenSSL package
+# Find native MSYS2 packages automatically
 find_package(OpenSSL REQUIRED)
+find_package(CURL REQUIRED)
 find_package(Threads REQUIRED)
 
 file(GLOB_RECURSE SOURCES
@@ -30,27 +18,23 @@ file(GLOB_RECURSE SOURCES
 list(APPEND SOURCES
     external/mongoose/mongoose.c
     external/cJSON/cJSON.c
-    external/sqlite3/sqlite3.c
 )
 
 add_executable(EncryptionAPI ${SOURCES})
 
-# Modern target-based include directories
 target_include_directories(EncryptionAPI PRIVATE
     include
     external/mongoose
     external/cJSON
-    external/sqlite3
-    ${OPENSSL_INCLUDE_DIR}
 )
 
-# 2. Link OpenSSL and its dependencies to your executable
 target_link_libraries(EncryptionAPI PRIVATE 
     OpenSSL::SSL 
     OpenSSL::Crypto
+    CURL::libcurl
     Threads::Threads
 )
 
 if(WIN32)
-    target_link_libraries(EncryptionAPI PRIVATE ws2_32 crypt32)
+    target_link_libraries(EncryptionAPI PRIVATE ws2_32 crypt32 wsock32)
 endif()

@@ -1,4 +1,6 @@
-const API_BASE_URL = 'http://localhost:3000';
+import { PUBLIC_API_BASE_URL } from '$env/static/public';
+
+const API_BASE_URL = PUBLIC_API_BASE_URL || 'http://localhost:3000';
 
 function bufferToBase64(buffer) {
     const bytes = new Uint8Array(buffer);
@@ -28,83 +30,155 @@ function arrayBufferToString(buffer) {
     return new TextDecoder().decode(buffer);
 }
 
-/**
- * Sends a structured payload to the C backend for encryption.
- * @param {string} methodName Name of the selected method (e.g., "End-to-End Encryption (E2EE)")
- * @param {string} plainText The raw message content
- * @param {string} recipientType Target medium ("Email" or "Phone Number")
- * @param {string} recipient Actual endpoint value
- * @returns {Promise<{encrypted_data: string, generated_key: string}>}
- */
-export async function sendEncryptionRequest(methodName, plainText, recipientType, recipient) {
+async function deriveKey(password, salt, iterations = 100000) {
+    const passwordBytes = stringToArrayBuffer(password);
+    const baseKey = await crypto.subtle.importKey(
+        'raw',
+        passwordBytes,
+        'PBKDF2',
+        false,
+        ['deriveBits']
+    );
+
+    const bits = await crypto.subtle.deriveBits(
+        {
+            name: 'PBKDF2',
+            salt,
+            iterations,
+            hash: 'SHA-256'
+        },
+        baseKey,
+        256
+    );
+
+    return crypto.subtle.importKey(
+        'raw',
+        bits,
+        { name: 'AES-GCM' },
+        false,
+        ['encrypt', 'decrypt']
+    );
+}
+
+async function encryptAesGcm(plaintext, key, iv) {
+    const encrypted = await crypto.subtle.encrypt(
+        {
+            name: 'AES-GCM',
+            iv,
+            tagLength: 128
+        },
+        key,
+        stringToArrayBuffer(plaintext)
+    );
+
+    const encryptedBytes = new Uint8Array(encrypted);
+    const tag = encryptedBytes.slice(encryptedBytes.length - 16);
+    const ciphertext = encryptedBytes.slice(0, encryptedBytes.length - 16);
+    return { ciphertext, tag };
+}
+
+async function buildEncryptedPackage(message, recipientType, recipient, password) {
+    const salt = crypto.getRandomValues(new Uint8Array(16));  // 16 bytes
+    const nonce = crypto.getRandomValues(new Uint8Array(12)); // 12 bytes
+    const key = await deriveKey(password, salt);
+
+    const payload = JSON.stringify({
+        text: message,
+        recipient_type: recipientType,
+        recipient: recipient
+    });
+
+    const { ciphertext, tag } = await encryptAesGcm(payload, key, nonce);
+
+    const totalLength = salt.length + nonce.length + tag.length + ciphertext.length;
+    const combined = new Uint8Array(totalLength);
+
+    combined.set(salt, 0);
+    combined.set(nonce, 16);
+    combined.set(tag, 28);
+    combined.set(ciphertext, 44);
+
+    return bufferToBase64(combined.buffer);
+}
+
+function unpackBase64Package(packedBase64) {
+    if (packedBase64.trim().startsWith('{')) {
+        return JSON.parse(packedBase64);
+    }
+
+    const buffer = base64ToArrayBuffer(packedBase64);
+    const bytes = new Uint8Array(buffer);
+
+    if (bytes.length < 44) {
+        throw new Error("Invalid encrypted package length.");
+    }
+
+    const salt = bytes.slice(0, 16);
+    const nonce = bytes.slice(16, 28);
+    const tag = bytes.slice(28, 44);
+    const ciphertext = bytes.slice(44);
+
+    return {
+        salt: bufferToBase64(salt.buffer),
+        nonce: bufferToBase64(nonce.buffer),
+        ciphertext: bufferToBase64(ciphertext.buffer),
+        authentication_tag: bufferToBase64(tag.buffer)
+    };
+}
+
+async function extractErrorMessage(response) {
     try {
-        const response = await fetch(`${API_BASE_URL}/encrypt`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                method: methodName,
-                message: plainText,
-                recipient_type: recipientType,
-                recipient: recipient
-            })
-        });
-
-        if (!response.ok) {
-            let errText = `Server status returned: ${response.status}`;
-            try {
-                const errJson = await response.json();
-                if (errJson && (errJson.error || errJson.message)) {
-                    errText += ` - ${errJson.error || errJson.message}`;
-                }
-            } catch (e) {
-                // ignore JSON parse errors, keep plain status
-            }
-            throw new Error(errText);
+        const errJson = await response.json();
+        if (errJson && (errJson.error || errJson.message)) {
+            return errJson.error || errJson.message;
         }
+    } catch (e) {
+    }
+    return `Server status returned: ${response.status}`;
+}
 
-        return await response.json();
+/**
+ * @param {string} plainText 
+ * @param {string} recipientType 
+ * @param {string} recipient 
+ * @param {string} password 
+ * @returns {Promise<{encrypted_package: string}>}
+ */
+export async function sendEncryptionRequest(plainText, recipientType, recipient, password) {
+    try {
+        const encrypted_package = await buildEncryptedPackage(plainText, recipientType, recipient, password);
+        return { encrypted_package };
     } catch (error) {
-        console.error('Network execution failure:', error);
+        console.error('Local encryption failure:', error);
         throw error;
     }
 }
 
 /**
- * Sends encrypted data to the C backend for decryption.
- * @param {string} methodName Name of the selected method
- * @param {string} encryptedData The base64-encoded encrypted payload
- * @param {string} otp One-time password for verification
- * @param {string} encryptionKey The base64-encoded key+IV token
- * @returns {Promise<{message: string}>}
+ * @param {string|object} encryptedPackage 
+ * @param {string} password 
+ * @returns {Promise<{session_id: string}>}
  */
-export async function sendDecryptionRequest(methodName, encryptedData, otp, encryptionKey) {
+export async function sendDecryptionRequest(encryptedPackage, password) {
     try {
+        const parsedPackage = typeof encryptedPackage === 'string'
+            ? unpackBase64Package(encryptedPackage)
+            : encryptedPackage;
+
         const response = await fetch(`${API_BASE_URL}/decrypt`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                method: methodName,
-                encrypted_data: encryptedData,
-                otp: otp,
-                encryption_key: encryptionKey
+                password: password,
+                encrypted_package: parsedPackage
             })
         });
 
         if (!response.ok) {
-            let errText = `Server status returned: ${response.status}`;
-            try {
-                const errJson = await response.json();
-                if (errJson && (errJson.error || errJson.message)) {
-                    errText += ` - ${errJson.error || errJson.message}`;
-                }
-            } catch (e) {
-                // ignore
-            }
-            throw new Error(errText);
+            const errorMessage = await extractErrorMessage(response);
+            throw new Error(errorMessage);
         }
 
         return await response.json();
@@ -114,67 +188,32 @@ export async function sendDecryptionRequest(methodName, encryptedData, otp, encr
     }
 }
 
-export async function generateLocalEncryption(methodName, plainText, recipientType, recipient) {
-    const key = await crypto.subtle.generateKey(
-        { name: 'AES-CBC', length: 256 },
-        true,
-        ['encrypt', 'decrypt']
-    );
+/**
+ * @param {string} sessionId 
+ * @param {string} otp 
+ * @returns {Promise<{plaintext: string}>}
+ */
+export async function verifyOtp(sessionId, otp) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/otp`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                session_id: sessionId,
+                otp: otp
+            })
+        });
 
-    const rawKey = new Uint8Array(await crypto.subtle.exportKey('raw', key));
-    const iv = crypto.getRandomValues(new Uint8Array(16));
+        if (!response.ok) {
+            const errorMessage = await extractErrorMessage(response);
+            throw new Error(errorMessage);
+        }
 
-    const payload = JSON.stringify({
-        method: methodName,
-        message: plainText,
-        recipient_type: recipientType,
-        recipient: recipient
-    });
-
-    const encryptedBuffer = await crypto.subtle.encrypt(
-        { name: 'AES-CBC', iv },
-        key,
-        stringToArrayBuffer(payload)
-    );
-
-    const encryptedData = bufferToBase64(encryptedBuffer);
-    const keyIv = new Uint8Array(rawKey.length + iv.length);
-    keyIv.set(rawKey, 0);
-    keyIv.set(iv, rawKey.length);
-
-    return {
-        encrypted_data: encryptedData,
-        generated_key: bufferToBase64(keyIv.buffer)
-    };
-}
-
-export async function decryptLocalPayload(encryptedData, encryptionKey) {
-    const ciphertext = base64ToArrayBuffer(encryptedData);
-    const keyIv = new Uint8Array(base64ToArrayBuffer(encryptionKey));
-    if (keyIv.length !== 48) {
-        throw new Error('Invalid encryption key length');
+        return await response.json();
+    } catch (error) {
+        console.error('OTP verification failed:', error);
+        throw error;
     }
-
-    const rawKey = keyIv.slice(0, 32);
-    const iv = keyIv.slice(32);
-    const cryptoKey = await crypto.subtle.importKey(
-        'raw',
-        rawKey,
-        { name: 'AES-CBC' },
-        false,
-        ['decrypt']
-    );
-
-    const decryptedBuffer = await crypto.subtle.decrypt(
-        { name: 'AES-CBC', iv },
-        cryptoKey,
-        ciphertext
-    );
-
-    return JSON.parse(arrayBufferToString(decryptedBuffer));
-}
-
-export async function sendOtpRequest(recipientType, recipient) {
-    // OTP is mocked in the frontend for the current prototype.
-    return Promise.resolve({ success: true, message: 'OTP mock sent' });
 }

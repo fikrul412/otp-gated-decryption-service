@@ -1,5 +1,5 @@
 #include "controllers/health_controller.h"
-#include "mongoose.h"  // Added to define struct mg_connection and mg_http_reply
+#include "mongoose.h"
 
 void health_controller(
     struct mg_connection *c,

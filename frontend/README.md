@@ -1,82 +1,97 @@
-    # Frontend — Svelte App
+# Frontend — Svelte Local Encryption UI
 
-    Brief
-    - Small Svelte + Vite frontend used to call the C backend's encrypt/decrypt endpoints. The UI contains two forms: encryption (produce `encrypted_data` + `generated_key`) and decryption (consume both to return plaintext message).
+The frontend performs local password-based encryption using Web Crypto (AES-256-GCM) and drives the backend decryption and OTP verification flow.
 
-    - Supports two modes: Server Side Encryption (backend encryption) and End-to-End Encryption (E2EE) with local client-side encryption and metadata extraction.
-    - OTP behavior is mocked in the frontend for the current prototype.
-    - In Server Side Encryption mode, the encryption key is not shown to the user and decryption is simulated with a hidden browser session key.
-    - In End-to-End Encryption mode, decryption is performed locally after mocked OTP verification.
+## Tech Stack
+- Framework: Svelte 5 / SvelteKit
+- Build Tool: Vite
+- Runtime: Node.js (v18+)
+- Package Manager: npm
 
-    Tech stack
-    - Svelte (Vite)
-    - Node.js (use a modern LTS, e.g., Node 18+)
-    - npm
+---
 
-    Install & run
-    1. Open a terminal in `frontend/`.
-    2. Install dependencies:
+## Directory Structure
+```
+frontend/
+├── .svelte-kit/           # Generated SvelteKit build & dev output
+├── node_modules/          # Installed npm dependencies
+├── static/                # Static public assets
+└── src/
+    ├── lib/               # Shared logic and reusable components
+    │   ├── assets/        # Styles, images, and visual assets
+    │   ├── components/    # Svelte UI components (e.g., forms, buttons)
+    │   └── services/      # Client API handlers & encryption routines (api.js)
+    └── routes/            # SvelteKit page routes
+        └── decrypt/       # Decryption & OTP flow view page
 
-    ```bash
-    npm install
-    ```
+```
 
-    3. Start dev server:
+## What It Does
 
-    ```bash
-    npm run dev
-    ```
+1. Local Encryption:
+   - Encrypts the client-side payload using password-derived AES-256-GCM (Web Crypto API).
+   - Packs binary outputs into a standard format: [16B Salt][12B Nonce][16B Tag][Ciphertext].
+   - Encodes the binary package as Base64 for clean payload transmission.
 
-    Files of interest
-    - `src/lib/components/EncryptForm.svelte` — encryption UI and wiring
-    - `src/lib/components/DecryptForm.svelte` — decryption UI and wiring
-    - `src/lib/services/api.js` — network calls to the backend (`/encrypt`, `/decrypt`)
+2. Backend Decryption Request:
+   - Sends the packed payload to POST /decrypt on the C backend.
+   - On success, stores the returned session_id for two-factor verification.
 
-    Usage
-    - Use the Encrypt form to create an `Encrypted Data` and `Generated Encryption Key`.
-    - Copy both values into the Decrypt form along with the OTP (the OTP flow is present but the backend currently treats OTP verification as a stub).
+3. OTP Verification:
+   - Captures the user's OTP input.
+   - Sends session_id and OTP to POST /otp/verify to receive the decrypted response.
 
-    Notes
-    - The frontend expects the backend at `http://localhost:3000` by default (`API_BASE_URL` in `src/lib/services/api.js`). Update if your server listens on a different host/port.
-    # sv
+---
 
-    Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+## Environment Setup (.env)
 
-    ## Creating a project
+Create a .env file in the root of the frontend/ directory:
+```
+PUBLIC_API_BASE_URL=http://localhost:3000
+```
 
-    If you're seeing this, you've probably already done this step. Congrats!
+## Installation & Setup
 
-    ```sh
-    # create a new project
-    npx sv create my-app
-    ```
+1. Navigate to the frontend directory:
 
-    To recreate this project with the same configuration:
+     cd frontend
 
-    ```sh
-    # recreate this project
-    npx sv@0.16.3 create --template minimal --no-types --install npm frontend
-    ```
+2. Install dependencies:
 
-    ## Developing
+     npm install
 
-    Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+---
 
-    ```sh
-    npm run dev
+## Running the Development Server
 
-    # or start the server and open the app in a new browser tab
-    npm run dev -- --open
-    ```
+Start the Vite development server:
 
-    ## Building
+  npm run dev
 
-    To create a production version of your app:
+By default, the application will be accessible at http://localhost:5173.
 
-    ```sh
-    npm run build
-    ```
+---
 
-    You can preview the production build with `npm run preview`.
+## Building for Production
 
-    > To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+To create an optimized production build:
+
+  npm run build
+
+To preview the built application locally:
+
+  npm run preview
+
+---
+
+## Key Files of Interest
+
+- src/routes/decrypt/ — The primary UI page routing for the decryption flow.
+- src/lib/services/api.js — Unpacks Base64 payload packages, handles Web Crypto calls, and interacts with backend API endpoints.
+- src/lib/components/ — UI forms for file upload, password input, and OTP entry.
+
+---
+
+## Project Notes
+- The frontend operates entirely through local encryption. There is no server-side /encrypt route called.
+- Make sure your backend C service (Mongoose API) is running on port 3000 before attempting decryption or OTP submissions.
