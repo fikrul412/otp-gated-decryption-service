@@ -1,6 +1,6 @@
 # Backend — OTP-Gated Decryption API
 
-This backend handles server-side decryption of encrypted packages, OTP verification, and API requests for the application. Client-side encryption is performed locally before submitting the package and password to this service.
+This backend manages server-side decryption of encrypted packages, OTP verification, and application API requests. Before transmission, the package and password are encrypted locally on the client side.
 
 ## Tech Stack
 - Language: C (C17 standard)
