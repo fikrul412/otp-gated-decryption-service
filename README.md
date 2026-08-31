@@ -6,10 +6,11 @@ A full-stack application featuring client-side Web Crypto encryption, a high-per
 
 ## Architecture Overview
 
-This project provides a secure client-to-server decryption workflow:
-1. Local Encryption (Frontend): Sensitive payloads are encrypted locally in the browser using AES-256-GCM before transmission.
-2. Binary Transit: Outputs (Salt, Nonce, Auth Tag, Ciphertext) are packed into a unified binary format and Base64-encoded to ensure clean payload transport.
-3. OTP Authentication & Decryption (Backend): The C backend receives the payload, initiates an OTP session, and performs OpenSSL decryption on the server only after two-factor validation succeeds.
+This project implements a secure client-to-server decryption workflow designed to protect sensitive data throughout transmission:
+
+1. Client-Side Encryption (Frontend): Sensitive data is encrypted directly in the user's browser using AES-256-GCM before being sent to the server.
+2. Binary Payload Transmission: The encryption components—including the Salt, Nonce, Authentication Tag, and Ciphertext—are combined into a single binary structure and Base64-encoded for reliable and consistent transmission.
+3. OTP-Verified Server-Side Decryption (Backend): The C-based backend receives the encrypted payload and initiates OTP verification. OpenSSL decryption is performed on the server only after the two-factor authentication process has been successfully completed.
 
 ---
 ## System Workflow Diagram
